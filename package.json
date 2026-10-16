@@ -12,7 +12,9 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test:api": "node --test tests/account.test.mjs"
+    "test:api": "node --test tests/account.test.mjs",
+    "prebuild": "node scripts/copy-learning-assets.mjs",
+    "test:practice": "node --test tests/practice.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -28,6 +30,7 @@
     "lucide-react": "^1.31.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",
+    "pdfjs-dist": "6.4.299",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
     "react-day-picker": "^10.0.1",
@@ -38,7 +41,8 @@
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76"
+    "zod": "^3.25.76",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

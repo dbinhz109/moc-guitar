@@ -57,3 +57,6 @@ next-env.d.ts
 
 # Local TypeScript cache
 *.tsbuildinfo
+
+# Generated PDF/OCR browser assets (copied from locked dependencies)
+/public/vendor/

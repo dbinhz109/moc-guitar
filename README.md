@@ -9,8 +9,9 @@ A beginner guitar learning website with English as the default language and a co
 - Follow three guided lessons with chord diagrams and a metronome.
 - Browse six basic chords and two built-in learning resources.
 - Upload, read and delete PDF, image and text documents (up to 10 MB each).
+- Choose **Learn this song** to extract chord names, review the progression and create guided practice sections. PDF text extraction and browser OCR for images/scanned PDF pages are supported.
 
-Documents stay in IndexedDB in the current browser, separated by account. Guest documents and progress are preserved separately. Uploaded documents do not automatically become lessons. Accounts do not require email; password recovery is not included.
+Documents stay in IndexedDB in the current browser, separated by account. Guest documents and progress are preserved separately. Practice plans are saved with each document. Chord extraction must be reviewed before starting; practice uses one chord per bar and suggested downstrokes. It does not transcribe exact timing, melody, staff notation or guitar tabs. Unsupported chord shapes are shown and require correction before practice. Accounts do not require email; password recovery is not included.
 
 ## Development
 
@@ -34,6 +35,7 @@ Against the running local preview:
 
 ```sh
 npm run test:api
+npm run test:practice
 npx tsc --noEmit
 node --check public/app.js
 ```
@@ -51,3 +53,9 @@ The API tests create disposable accounts in local D1. They cover registration, v
 - Only the authenticated account can update its progress. Browser clients cannot supply another account ID to bypass this check.
 
 Sites hosting is configured in `.openai/hosting.json`. Its platform access policy is separate from the website's username/password accounts. Deployment applies the checked-in Drizzle migrations before publishing. Do not commit local databases, credentials, `.env` files or build artifacts.
+
+## Learning from documents
+
+Use **My library → Upload → Learn this song**. For PDFs, choose the page to read. Review the extracted text and chord order, adjust the practice tempo/meter, then build the practice plan. Practice sections contain up to four chord changes, chord diagrams, string/fret instructions and an audible metronome that highlights the current chord. Repeated chords are preserved. Finish each section and resume later in the same browser.
+
+PDF.js and Tesseract.js browser assets are generated from pinned npm dependencies by `npm run prebuild` (also run automatically by `npm run build`). `npm run prebuild` is needed once before a fresh development preview. OCR downloads English recognition data from the Tesseract.js data CDN on first use; document recognition itself runs in the browser. English data is used for Latin chord names; recognized lyrics may need correction.

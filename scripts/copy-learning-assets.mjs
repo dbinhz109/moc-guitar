@@ -1,0 +1,16 @@
+import {cp,mkdir,readdir,copyFile} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+const root=process.cwd();
+const vendor=resolve(root,'public/vendor');
+const pdf=resolve(root,'node_modules/pdfjs-dist');
+const ocr=resolve(root,'node_modules/tesseract.js');
+const core=resolve(root,'node_modules/tesseract.js-core');
+await mkdir(join(vendor,'pdfjs'),{recursive:true});
+for(const name of ['pdf.mjs','pdf.worker.mjs'])await copyFile(join(pdf,'build',name),join(vendor,'pdfjs',name));
+for(const name of ['wasm','standard_fonts','cmaps'])await cp(join(pdf,name),join(vendor,'pdfjs',name),{recursive:true});
+await copyFile(join(pdf,'LICENSE'),join(vendor,'pdfjs/LICENSE'));
+await mkdir(join(vendor,'ocr/core'),{recursive:true});
+for(const name of ['tesseract.min.js','worker.min.js','tesseract.min.js.LICENSE.txt','worker.min.js.LICENSE.txt'])await copyFile(join(ocr,'dist',name),join(vendor,'ocr',name));
+for(const name of await readdir(core))if(name.startsWith('tesseract-core')&&(name.endsWith('.wasm.js')||name.endsWith('.wasm')))await copyFile(join(core,name),join(vendor,'ocr/core',name));
+await copyFile(join(core,'LICENSE'),join(vendor,'ocr/core/LICENSE'));
+console.log('Prepared browser PDF and OCR assets.');
