@@ -29,7 +29,7 @@ const digest = (token: string) => createHash("sha256").update(token).digest("hex
 function sessionCookie(request: Request, token: string, maxAge = WEEK) {
   return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`;
 }
-export async function readJSON(request: Request): Promise<Record<string, unknown>> {
+export async function readJSON(request: Request, maxBytes = 4096): Promise<Record<string, unknown>> {
   const origin = request.headers.get("origin");
   const sameOrigin = origin === new URL(request.url).origin && request.headers.get("sec-fetch-site") !== "cross-site";
   const jsonContent = request.headers.get("content-type")?.startsWith("application/json");
@@ -39,7 +39,7 @@ export async function readJSON(request: Request): Promise<Record<string, unknown
   while (true) {
     const {done,value}=await reader.read();if(done)break;
     size+=value.length;
-    if(size>4096){await reader.cancel();throw new AccountError("invalid_request",413)}
+    if(size>maxBytes){await reader.cancel();throw new AccountError("invalid_request",413)}
     parts.push(value);
   }
   reader.releaseLock();

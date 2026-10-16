@@ -28,3 +28,29 @@ test('handles chord names joined together by OCR on chord-only lines',()=>{
  assert.deepEqual(detect('Practice Song\nGD EmC\nAm C GG').sequence,['G','D','Em','C','Am','C','G','G']);
  assert.deepEqual(detect('BAD\nA beautiful day').sequence,[]);
 });
+
+test('retains isolated score labels without interpreting prose as chords',()=>{
+ assert.deepEqual(detect('C\nAm\nF\nG\nEm\nDm').sequence,['C','Am','F','G','Em','Dm']);
+ assert.deepEqual(detect('A\nbeautiful morning').sequence,[]);
+});
+test('preserves 2/4 and leaves unknown meter unknown',()=>{
+ assert.equal(detect('2/4\nC G Am F').meter,'2/4');assert.equal(detect('C G Am F').meter,null);
+});
+test('models bar timing and section repeats without flattening the song',()=>{
+ const {sections}=globalThis.MocPractice.parseChart('Verse x2\nC:1 G:1 | Am:2',{strict:true});
+ const timeline=globalThis.MocPractice.makeTimeline(sections,'2/4');
+ assert.equal(sections[0].repeat,2);assert.equal(timeline.total,8);
+ assert.deepEqual(timeline.events.map(e=>e.start),[0,1,2,4,5,6]);
+});
+test('rejects unknown duration, unsupported meter and incorrect bar totals',()=>{
+ const p=globalThis.MocPractice;
+ assert.throws(()=>p.makeTimeline(p.parseChart('C:? | G:?').sections,'2/4'),/duration/);
+ assert.throws(()=>p.makeTimeline(p.parseChart('C:4').sections,'2/4'),/duration/);
+ assert.throws(()=>p.makeTimeline(p.parseChart('C:2').sections,''),/meter/);
+ assert.deepEqual(p.parseChart('C:2\nincorrect data',{strict:true}).invalid,['incorrect data']);
+});
+test('simplified timing is explicit and preserves section structure',()=>{
+ const p=globalThis.MocPractice;const source=p.detect('Verse: C G\nChorus: Am F x2').sections;
+ const simplified=p.fillTiming(source,'2/4');assert.equal(simplified.length,2);assert.equal(simplified[1].repeat,2);assert.equal(p.makeTimeline(simplified,'2/4').total,12);
+ const roundTrip=p.parseChart(p.chartText(simplified),{strict:true});assert.deepEqual(roundTrip.invalid,[]);assert.equal(p.makeTimeline(roundTrip.sections,'2/4').total,12);
+});

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -21,3 +21,17 @@ export const authLimits = sqliteTable("auth_limits", {
   count: integer("count").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+export const documents = sqliteTable("documents", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  clientId: text("client_id").notNull(),
+  name: text("name").notNull(),
+  ext: text("ext").notNull(),
+  size: integer("size").notNull(),
+  contentHash: text("content_hash").notNull(),
+  storageKey: text("storage_key").notNull(),
+  practice: text("practice"),
+  revision: integer("revision").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+}, table => [uniqueIndex("documents_user_client_unique").on(table.userId, table.clientId)]);

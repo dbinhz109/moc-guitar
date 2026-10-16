@@ -1,61 +1,84 @@
 # Mộc Guitar Studio
 
-A beginner guitar learning website with English as the default language and a complete Vietnamese interface.
+A beginner guitar learning studio, English by default with Vietnamese localization.
 
-## What you can do
+## Learn from a document
 
-- Create an account using a username and password; sign in and sign out.
-- Save lesson progress to your account and continue in another browser or device.
-- Follow three guided lessons with chord diagrams and a metronome.
-- Browse six basic chords and two built-in learning resources.
-- Upload, read and delete PDF, image and text documents (up to 10 MB each).
-- Choose **Learn this song** to extract chord names, review the progression and create guided practice sections. PDF text extraction and browser OCR for images/scanned PDF pages are supported.
+1. Open **My library** and upload a PDF, PNG/JPEG/WebP or UTF-8 text/Markdown file (up to 10 MB).
+2. The document viewer includes **Review chords & learn**. The review screen keeps the original beside the editable plan, with image zoom and PDF page selection.
+3. Review candidate chord labels. Image reading detects staff bands and reads the labels above them when possible. Results are never treated as verified automatically; an empty result explicitly says no lesson was created.
+4. Confirm the source meter: 2/4, 3/4, 4/4 or 6/8. Unknown meters remain unselected.
+5. Enter chord durations and bars, or explicitly apply **one-bar practice timing** for a simplified exercise.
+6. Confirm your review, then save and practice. Playback follows the declared bars, durations and section repeats, with optional synthesized chord changes and separate chord previews.
 
-Documents stay in IndexedDB in the current browser, separated by account. Guest documents and progress are preserved separately. Practice plans are saved with each document. Chord extraction must be reviewed before starting; practice uses one chord per bar and suggested downstrokes. It does not transcribe exact timing, melody, staff notation or guitar tabs. Unsupported chord shapes are shown and require correction before practice. Accounts do not require email; password recovery is not included.
+Example in 2/4:
 
-## Development
+```text
+Verse x2
+C:1 G:1 | Am:2
+
+Chorus
+F:2 | C:2
+```
+
+`|` separates bars. `C:2` holds C for two counts; `C:?` means duration unknown and blocks playback. `-:1` is a one-count rest. Every bar must total the meter numerator. In 6/8, each click counts an eighth note. Names such as Verse/Chorus/Intro/Bridge/Outro/Section label sections; `x2` repeats a section twice.
+
+The app teaches chord accompaniment. It does not automatically transcribe staff notes, melody, exact strumming patterns, repeat signs drawn on a score or guitar tablature. Image recognition can miss or confuse chord names, particularly in small images. Always compare against the displayed source. Automatically detected score sections correspond to staff lines and require review.
+
+## Accounts and library storage
+
+- Username/password registration, sign-in and sign-out. No email is required; password recovery is not included.
+- Cloudflare D1 stores accounts, sessions, lesson progress, document metadata and practice plans.
+- R2 stores each account's original documents. Library records and plans sync across browsers/devices after signing in.
+- Existing account-scoped browser documents migrate to that same account. Guest files remain local until the user explicitly chooses **Import browser files**; guest originals are retained.
+- Guest documents and plans use IndexedDB. Clearing browser data removes guest data.
+- Account library limits: 100 files, 200 MB total, 10 MB per file. Requests enforce session ownership, file signatures, origin checks and revision checks for concurrent plan editing.
+- Three built-in lessons, a six-chord reference, two reading resources and a standalone metronome remain available.
+
+## Run locally
 
 Requires Node.js >=22.13.0.
 
 ```sh
 npm ci
-npm run db:generate # only after changing db/schema.ts
 npm run build
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_spotty_steve_rogers.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_optimal_stone_men.sql
 npm start -- --port 4173
 ```
 
-Open http://127.0.0.1:4173. Apply each new migration once, in order. Local and production databases are separate.
+Apply each migration once, in order. Local D1/R2 and hosted resources are separate. `npm run dev` starts a development server after the initial build/assets setup. Generate new migrations with `npm run db:generate` after changing `db/schema.ts`.
 
-For subsequent UI development, `npm run dev` starts the Vinext development server. Build after changing hosting bindings before applying local migrations.
+## Validate
 
-## Validation
+```sh
+npm run test:practice
+npx tsc --noEmit
+node --check public/library.js
+node --check public/document-reader.js
+node --check public/practice-guide.js
+```
 
-Against the running local preview:
+Against a running local preview:
 
 ```sh
 npm run test:api
-npm run test:practice
-npx tsc --noEmit
-node --check public/app.js
+npm run test:library
 ```
 
-The API tests create disposable accounts in local D1. They cover registration, validation, session rotation/invalidation, account ownership, progress isolation, cross-origin rejection and login rate limits. `MOC_TEST_BASE_URL` can select another loopback preview URL.
+API tests create disposable accounts in local D1/R2. `MOC_TEST_BASE_URL` selects another loopback preview. Tests cover authentication/session ownership, file ownership and content checks, import deduplication, optimistic revisions, isolated chord labels, unknown meter, 2/4 timing, bars and section repeats.
 
-## Implementation
+## Source and hosting
 
-- Vinext on Cloudflare Workers; Cloudflare D1 stores accounts, sessions and progress.
-- `studio.html` and `public/` contain the interface. `app/route.ts` serves the HTML.
-- `lib/account.ts` handles authentication; API handlers live in `app/api/`.
-- Passwords use salted scrypt (N=32768, r=8, p=3). Plaintext passwords are never stored.
-- Sessions use random tokens in HttpOnly, SameSite=Lax cookies, Secure on HTTPS, with a seven-day expiry. Only token hashes are stored in D1.
-- Login/registration requests have server-side rate limits and origin checks.
-- Only the authenticated account can update its progress. Browser clients cannot supply another account ID to bypass this check.
+- `studio.html` and `public/` contain the interface; `app/route.ts` serves the HTML.
+- `public/chord-engine.js`: chord recognition, bar/section model and validated playback timelines.
+- `public/document-reader.js`: browser PDF extraction and image/staff-label OCR.
+- `public/library.js`: guest storage, account migration/import, file viewer and cloud library access.
+- `public/practice-guide.js`: source review, plan editor, progress and audio playback.
+- `lib/account.ts` and `lib/library.ts`: server authentication, authorization and storage.
 
-Sites hosting is configured in `.openai/hosting.json`. Its platform access policy is separate from the website's username/password accounts. Deployment applies the checked-in Drizzle migrations before publishing. Do not commit local databases, credentials, `.env` files or build artifacts.
+Passwords use salted scrypt (N=32768, r=8, p=3). Seven-day sessions use random tokens in HttpOnly, SameSite=Lax cookies, Secure on HTTPS; only token hashes are stored. Login/registration requests are rate-limited.
 
-## Learning from documents
+PDF.js/Tesseract browser assets are generated from pinned dependencies by `prebuild`. OCR downloads English recognition data from the Tesseract data CDN on first use; recognition runs in the browser. The English model targets Latin chord labels; lyrics may be inaccurate.
 
-Use **My library → Upload → Learn this song**. For PDFs, choose the page to read. Review the extracted text and chord order, adjust the practice tempo/meter, then build the practice plan. Practice sections contain up to four chord changes, chord diagrams, string/fret instructions and an audible metronome that highlights the current chord. Repeated chords are preserved. Finish each section and resume later in the same browser.
-
-PDF.js and Tesseract.js browser assets are generated from pinned npm dependencies by `npm run prebuild` (also run automatically by `npm run build`). `npm run prebuild` is needed once before a fresh development preview. OCR downloads English recognition data from the Tesseract.js data CDN on first use; document recognition itself runs in the browser. English data is used for Latin chord names; recognized lyrics may need correction.
+Sites hosting configuration lives in `.openai/hosting.json`; D1/R2 bindings are provisioned by Sites. Platform access is separate from username/password accounts and remains owner-private. Deployment applies checked-in migrations. Never commit credentials, local databases, `.env` files or generated assets.

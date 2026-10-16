@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "test:api": "node --test tests/account.test.mjs",
     "prebuild": "node scripts/copy-learning-assets.mjs",
-    "test:practice": "node --test tests/practice.test.mjs"
+    "test:practice": "node --test tests/practice.test.mjs",
+    "test:library": "node --test tests/library.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -20,23 +20,51 @@ function parseSequence(value){
  for(const token of tokens){const chord=normalize(token);if(exact.test(chord))sequence.push(chord);else invalid.push(token)}
  return {sequence,invalid,unsupported:[...new Set(sequence.filter(c=>!shapes[c]))]};
 }
-function detect(text){
- const sequence=[];let confidence='none';
- for(const line of String(text).slice(0,200000).split(/\r?\n/)){
-   const bracketed=[...line.matchAll(new RegExp('\\[('+chordSource+')\\]','g'))].map(m=>normalize(m[1]));
-   if(bracketed.length){sequence.push(...bracketed);confidence='chords';continue;}
-   const clean=line.replace(/^(?:intro|verse|chorus|bridge|outro|điệp khúc|đoạn|hợp âm|chords?)\s*\d*\s*:?/i,'').replace(/\b(?:x|×)\s*\d+\b/gi,'').trim();
-   const rawTokens=clean.replace(/[|,;·→–—]/g,' ').split(/\s+/).filter(Boolean);
-   const tokens=rawTokens.flatMap(token=>{const normalized=normalize(token);if(exact.test(normalized))return [normalized];if(rawTokens.length>1 && new RegExp('^(?:'+chordSource+')+$').test(normalized))return normalized.match(new RegExp(chordSource,'g')).map(normalize);return [normalized]});
-   if(tokens.length && tokens.every(token=>exact.test(normalize(token)))){
-     // Single-letter words in prose are ambiguous; only accept isolated single chords when extended (Am, G7…).
-     if(tokens.length===1 && tokens[0].length===1)continue;
-     sequence.push(...tokens.map(normalize));confidence='chords';
-   }
+function parseChart(text,options={}){
+ const sections=[];let section={name:'',repeat:1,bars:[]};let invalid=[];let explicit=false;
+ const lines=String(text).slice(0,100000).split(/\r?\n/);
+ const candidateLines=lines.filter(line=>{const x=line.trim();return exact.test(normalize(x))}).length;
+ function flush(){if(section.bars.length)sections.push(section);section={name:'',repeat:1,bars:[]}}
+ function eventsFor(value){
+  const events=[];for(const raw of value.trim().split(/\s+/).filter(Boolean)){
+   const token=raw.replace(/^[\[\](]+|[\])]+$/g,'');
+   const match=token.match(/^(.+?)(?::(\?|\d+(?:\.\d+)?))?$/);if(!match)continue;
+   const chord=normalize(match[1]);const beats=match[2]&&match[2]!=='?'?Number(match[2]):null;
+   if(!exact.test(chord)&&chord!=='-'){invalid.push(raw);continue}
+   if(beats!==null&&(!Number.isFinite(beats)||beats<=0||beats>32)){invalid.push(raw);continue}
+   events.push({chord,beats});
+  }return events;
  }
- const time=text.match(/\b([2346])\s*\/\s*([48])\b/);
- const tempo=text.match(/\b(\d{2,3})\s*(?:BPM|bpm)\b/);
- return {sequence:sequence.slice(0,256),confidence,unsupported:[...new Set(sequence.filter(c=>!shapes[c]))],meter:time?`${time[1]}/${time[2]}`:null,bpm:tempo&&+tempo[1]>=40&&+tempo[1]<=180?+tempo[1]:null,hasTab:/^[eBGDAE]\s*\|[-\d|hpbr~\/\\]+/m.test(text)};
+ for(let line of lines){line=line.trim();if(!line)continue;
+  const heading=line.match(/^(?:\[)?(Intro|Verse|Chorus|Bridge|Outro|Section|Đoạn|Điệp khúc)(?:\s+(\d+))?(?:\])?\s*(?:[x×]\s*(\d+))?\s*:?\s*(.*)$/i);
+  if(heading){flush();section.name=heading[1]+(heading[2]?' '+heading[2]:'');section.repeat=Math.min(8,Number(heading[3])||1);line=heading[4].trim();if(!line)continue;}
+  const repeat=line.match(/\s+[x×]\s*(\d+)\s*$/i);if(repeat){section.repeat=Math.min(8,Number(repeat[1])||1);line=line.slice(0,repeat.index).trim();}
+  const bracketed=[...line.matchAll(new RegExp('\\[('+chordSource+')\\]','g'))].map(m=>({chord:normalize(m[1]),beats:null}));
+  if(bracketed.length){section.bars.push(...bracketed.map(event=>({events:[event],explicit:false})));continue}
+  const tokenText=line.replace(/[|,;·→–—]/g,' ').trim();
+  const raw=tokenText.split(/\s+/).filter(Boolean);
+  const joined=raw.flatMap(token=>exact.test(normalize(token))?[token]:(raw.length>1&&new RegExp('^(?:'+chordSource+')+$').test(normalize(token))?normalize(token).match(new RegExp(chordSource,'g')):[token]));
+  const all=joined.every(token=>token==='-'||new RegExp('^(?:'+chordSource+'|\\-)(?::(?:\\?|[0-9]+(?:\\.[0-9]+)?))?$').test(normalize(token)));
+  if(!all||!joined.length){if(options.strict)invalid.push(line);continue;}
+  if(joined.length===1&&joined[0].length===1&&!options.allowSingle&&candidateLines<2)continue;
+  if(line.includes('|')){explicit=true;for(const barText of line.split('|').filter(x=>x.trim())){const events=eventsFor(barText);if(events.length)section.bars.push({events,explicit:true})}}
+  else for(const token of joined){const events=eventsFor(token);if(events.length)section.bars.push({events,explicit:false})}
+ }
+ flush();return {sections,invalid,explicit};
+}
+function detect(text,options={}){
+ const parsed=parseChart(text,options);const sequence=parsed.sections.flatMap(s=>s.bars.flatMap(b=>b.events.filter(e=>e.chord!=='-').map(e=>e.chord))).slice(0,256);
+ const time=text.match(/\b(2\/4|3\/4|4\/4|6\/8)\b/);const tempo=text.match(/\b(\d{2,3})\s*BPM\b/i);
+ return {...parsed,sequence,confidence:sequence.length?'review':'none',unsupported:[...new Set(sequence.filter(c=>!shapes[c]))],meter:time?time[1]:null,bpm:tempo&&+tempo[1]>=40&&+tempo[1]<=180?+tempo[1]:null,hasTab:/^[eBGDAE]\s*\|[-\d|hpbr~\/\\]+/m.test(text)};
+}
+function chartText(sections){return sections.map(s=>(s.name||'Section')+(s.repeat>1?' x'+s.repeat:'')+'\n'+s.bars.map(b=>b.events.map(e=>e.chord+':'+(e.beats??'?')).join(' ')).join(' | ')).join('\n\n')}
+function fillTiming(sections,meter){const count=Number(meter.split('/')[0]);return sections.map(s=>({...s,bars:s.bars.flatMap(b=>b.events.map(e=>({events:[{chord:e.chord,beats:count}],explicit:true})))}))}
+function makeTimeline(sections,meter){if(!['2/4','3/4','4/4','6/8'].includes(meter))throw Error('meter');const count=Number(meter.split('/')[0]);let cursor=0;const events=[];
+ for(let si=0;si<sections.length;si++){const section=sections[si];if(!Number.isInteger(section.repeat)||section.repeat<1||section.repeat>8)throw Error('repeat');
+  for(let repeat=0;repeat<section.repeat;repeat++)for(let bi=0;bi<section.bars.length;bi++){const bar=section.bars[bi];const sum=bar.events.reduce((sum,e)=>sum+(e.beats||0),0);if(!bar.events.length||bar.events.some(e=>!Number.isFinite(e.beats)||e.beats<=0)||Math.abs(sum-count)>.001)throw Error('duration');
+   for(const [eventIndex,event] of bar.events.entries()){if(event.chord!=='-'&&!shapes[event.chord])throw Error('chord');events.push({...event,eventIndex,start:cursor,section:si,bar:bi,repeat});cursor+=event.beats;}
+  }
+ }if(!events.length||events.length>2048)throw Error('empty');return {events,total:cursor};
 }
 function segments(sequence,size=4){const result=[];for(let i=0;i<sequence.length;i+=size)result.push(sequence.slice(i,i+size));return result}
 function fingering(chord,language){const shape=shapes[chord];if(!shape)return '';
@@ -44,5 +72,5 @@ function fingering(chord,language){const shape=shapes[chord];if(!shape)return ''
  const skip=shape.map((f,i)=>f===-1?6-i:null).filter(Boolean),open=shape.map((f,i)=>f===0?6-i:null).filter(Boolean);
  return (vi?'Bấm ':'Press ')+fretted.join('; ')+'. '+(open.length?(vi?'Dây buông: ':'Open strings: ')+open.join(', ')+'. ':'')+(skip.length?(vi?'Không gảy dây ':'Skip strings ')+skip.join(', ')+'. ':'')+(['Cm','Gm','F','Fm','F#','F#m','B','Bm','Bm7','Bb'].includes(chord)?(vi?'Dùng ngón trỏ chặn các dây cùng ngăn thấp nhất.':'Use your index finger as a barre across strings at the lowest fretted position.'):'');
 }
-root.MocPractice={shapes,normalize,parseSequence,detect,segments,fingering};
+root.MocPractice={shapes,normalize,parseSequence,parseChart,chartText,fillTiming,makeTimeline,detect,segments,fingering};
 })(globalThis);
