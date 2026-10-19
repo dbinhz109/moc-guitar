@@ -15,18 +15,21 @@
     "test:api": "node --test tests/account.test.mjs",
     "prebuild": "node scripts/copy-learning-assets.mjs",
     "test:practice": "node --test tests/practice.test.mjs",
-    "test:library": "node --test tests/library.test.mjs"
+    "test:library": "node --test tests/library.test.mjs",
+    "test:musicxml": "node --test tests/musicxml.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
+    "@xmldom/xmldom": "0.9.12",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
     "drizzle-orm": "0.45.2",
     "embla-carousel-react": "^8.6.0",
+    "fflate": "0.8.3",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.31.0",
     "next": "16.3.4",
@@ -41,9 +44,9 @@
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "3.6.0",
+    "tesseract.js": "7.0.0",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76",
-    "tesseract.js": "7.0.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",

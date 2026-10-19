@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
 import { createHash } from "node:crypto";
 import { AccountError, currentUser, readJSON, reply } from "./account";
+import { validMusicXML } from './musicxml-file';
 const MAX_FILE = 10 * 1024 * 1024;
-const MIME:Record<string,string>={pdf:"application/pdf",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",txt:"text/plain; charset=utf-8",md:"text/plain; charset=utf-8"};
+const MIME:Record<string,string>={pdf:"application/pdf",png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",webp:"image/webp",txt:"text/plain; charset=utf-8",md:"text/plain; charset=utf-8",xml:'text/plain; charset=utf-8',musicxml:'text/plain; charset=utf-8',mxl:'application/vnd.recordare.musicxml'};
 type DocumentRow={id:string;user_id:string;client_id:string;name:string;ext:string;size:number;storage_key:string;content_hash:string;practice:string|null;revision:number;created_at:number};
 function stores(){if(!env.DB||!env.BUCKET)throw new AccountError("unavailable",503);return {db:env.DB,bucket:env.BUCKET}}
 async function owner(request:Request,write=false){const user=await currentUser(request);if(!user)throw new AccountError("sign_in_required",401);if(write&&request.headers.get("x-moc-account")!==user.id)throw new AccountError("account_changed",409);return user}
@@ -12,6 +13,7 @@ async function rowFor(request:Request,id:string,write=false){const user=await ow
 export async function listDocuments(request:Request){const user=await owner(request);const result=await stores().db.prepare("SELECT * FROM documents WHERE user_id = ? ORDER BY created_at DESC, id").bind(user.id).all<DocumentRow>();return reply({files:result.results.map(expose)})}
 async function boundedBody(request:Request,max:number){if(Number(request.headers.get("content-length"))>max)throw new AccountError("file_too_large",413);const reader=request.body?.getReader();if(!reader)throw new AccountError("invalid_request");const parts:Uint8Array[]=[];let total=0;while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>max){await reader.cancel();throw new AccountError("file_too_large",413)}parts.push(value)}reader.releaseLock();const bytes=new Uint8Array(total);let offset=0;for(const p of parts){bytes.set(p,offset);offset+=p.length}return bytes}
 function validateContent(ext:string,bytes:Uint8Array){
+ if(['xml','musicxml','mxl'].includes(ext))return validMusicXML(ext,bytes);
  if(ext==='pdf')return new TextDecoder().decode(bytes.slice(0,5))==='%PDF-';
  if(ext==='png')return bytes.length>8&&[137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b);
  if(ext==='jpg'||ext==='jpeg')return bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
@@ -52,10 +54,12 @@ export async function updatePractice(request:Request,id:string){
    for(const bar of section.bars){
     if(!bar||!Array.isArray(bar.events)||!bar.events.length||bar.events.length>16)throw new AccountError('invalid_request');
     let sum=0;
-    for(const event of bar.events){events++;if(events>512||typeof event.chord!=='string'||!/^([A-G](#|b)?[a-zA-Z0-9]*(\/[A-G](#|b)?)?|-)$/.test(event.chord)||typeof event.beats!=='number'||!Number.isFinite(event.beats)||event.beats<=0||event.beats>6)throw new AccountError('invalid_request');sum+=event.beats;}
+    for(const event of bar.events){events++;if(events>512||typeof event.chord!=='string'||!/^([A-G](#|b)?[a-zA-Z0-9]*(\/[A-G](#|b)?)?|-)$/.test(event.chord)||typeof event.beats!=='number'||!Number.isFinite(event.beats)||event.beats<=0||event.beats>6)throw new AccountError('invalid_request');if(event.notes!==undefined&&(!Array.isArray(event.notes)||!event.notes.length||event.notes.length>6||event.chord!=='-'||event.notes.some((n:unknown)=>typeof n!=='number'||!Number.isInteger(n)||n<40||n>88)))throw new AccountError('invalid_request');sum+=event.beats;}
     if(Math.abs(sum-Number(String(value.meter).split('/')[0]))>.001)throw new AccountError('invalid_request');
    }
   }
+  if(value.lessonStage!==undefined&&(!Number.isInteger(value.lessonStage)||Number(value.lessonStage)<0||Number(value.lessonStage)>2))throw new AccountError('invalid_request');
+  if(value.anchors!==undefined&&(!Array.isArray(value.anchors)||value.anchors.length>512||value.anchors.some(a=>!a||typeof a.id!=='string'||a.id.length>100||!Number.isInteger(a.index)||a.index<0||a.index>=events||typeof a.chord!=='string'||a.chord.length>20||!Number.isFinite(a.x)||a.x<0||a.x>1||!Number.isFinite(a.y)||a.y<0||a.y>1)))throw new AccountError('invalid_request');
  }else if(!Array.isArray(value.sequence)||!value.sequence.length||value.sequence.length>256)throw new AccountError('invalid_request');
  const json=JSON.stringify(plan);if(json.length>240000)throw new AccountError('invalid_request',413);
  const result=await stores().db.prepare('UPDATE documents SET practice = ?, revision = revision + 1 WHERE id = ? AND user_id = ? AND revision = ?').bind(json,id,row.user_id,body.revision).run();

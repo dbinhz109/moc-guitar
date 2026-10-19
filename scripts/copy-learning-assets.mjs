@@ -13,4 +13,7 @@ await mkdir(join(vendor,'ocr/core'),{recursive:true});
 for(const name of ['tesseract.min.js','worker.min.js','tesseract.min.js.LICENSE.txt','worker.min.js.LICENSE.txt'])await copyFile(join(ocr,'dist',name),join(vendor,'ocr',name));
 for(const name of await readdir(core))if(name.startsWith('tesseract-core')&&(name.endsWith('.wasm.js')||name.endsWith('.wasm')))await copyFile(join(core,name),join(vendor,'ocr/core',name));
 await copyFile(join(core,'LICENSE'),join(vendor,'ocr/core/LICENSE'));
+await mkdir(join(vendor,'musicxml'),{recursive:true});
+await copyFile(resolve(root,'node_modules/fflate/esm/browser.js'),join(vendor,'musicxml/fflate.mjs'));
+await copyFile(resolve(root,'node_modules/fflate/LICENSE'),join(vendor,'musicxml/LICENSE'));
 console.log('Prepared browser PDF and OCR assets.');

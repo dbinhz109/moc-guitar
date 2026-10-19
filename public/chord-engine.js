@@ -30,9 +30,10 @@ function parseChart(text,options={}){
    const token=raw.replace(/^[\[\](]+|[\])]+$/g,'');
    const match=token.match(/^(.+?)(?::(\?|\d+(?:\.\d+)?))?$/);if(!match)continue;
    const chord=normalize(match[1]);const beats=match[2]&&match[2]!=='?'?Number(match[2]):null;
-   if(!exact.test(chord)&&chord!=='-'){invalid.push(raw);continue}
+   const notes=root.MocNotes?.parseNoteToken(chord);
+   if(!exact.test(chord)&&chord!=='-'&&!notes){invalid.push(raw);continue}
    if(beats!==null&&(!Number.isFinite(beats)||beats<=0||beats>32)){invalid.push(raw);continue}
-   events.push({chord,beats});
+   events.push({chord:notes?'-':chord,...(notes?{notes}:{}),beats});
   }return events;
  }
  for(let line of lines){line=line.trim();if(!line)continue;
@@ -44,7 +45,7 @@ function parseChart(text,options={}){
   const tokenText=line.replace(/[|,;·→–—]/g,' ').trim();
   const raw=tokenText.split(/\s+/).filter(Boolean);
   const joined=raw.flatMap(token=>exact.test(normalize(token))?[token]:(raw.length>1&&new RegExp('^(?:'+chordSource+')+$').test(normalize(token))?normalize(token).match(new RegExp(chordSource,'g')):[token]));
-  const all=joined.every(token=>token==='-'||new RegExp('^(?:'+chordSource+'|\\-)(?::(?:\\?|[0-9]+(?:\\.[0-9]+)?))?$').test(normalize(token)));
+  const all=joined.every(token=>token==='-'||root.MocNotes?.parseNoteToken(token.split(':')[0])||new RegExp('^(?:'+chordSource+'|\\-)(?::(?:\\?|[0-9]+(?:\\.[0-9]+)?))?$').test(normalize(token)));
   if(!all||!joined.length){if(options.strict)invalid.push(line);continue;}
   if(joined.length===1&&joined[0].length===1&&!options.allowSingle&&candidateLines<2)continue;
   // A timed line without separators is one bar, including a saved single-bar section.
@@ -59,12 +60,12 @@ function detect(text,options={}){
  const time=text.match(/\b(2\/4|3\/4|4\/4|6\/8)\b/);const tempo=text.match(/\b(\d{2,3})\s*BPM\b/i);
  return {...parsed,sequence,confidence:sequence.length?'review':'none',unsupported:[...new Set(sequence.filter(c=>!shapes[c]))],meter:time?time[1]:null,bpm:tempo&&+tempo[1]>=40&&+tempo[1]<=180?+tempo[1]:null,hasTab:/^[eBGDAE]\s*\|[-\d|hpbr~\/\\]+/m.test(text)};
 }
-function chartText(sections){return sections.map(s=>(s.name||'Section')+(s.repeat>1?' x'+s.repeat:'')+'\n'+s.bars.map(b=>b.events.map(e=>e.chord+':'+(e.beats??'?')).join(' ')).join(' | ')).join('\n\n')}
-function fillTiming(sections,meter){const count=Number(meter.split('/')[0]);return sections.map(s=>({...s,bars:s.bars.flatMap(b=>b.events.map(e=>({events:[{chord:e.chord,beats:count}],explicit:true})))}))}
+function chartText(sections){return sections.map(s=>(s.name||'Section')+(s.repeat>1?' x'+s.repeat:'')+'\n'+s.bars.map(b=>b.events.map(e=>(e.notes?.length?root.MocNotes.noteToken(e.notes):e.chord)+':'+(e.beats??'?')).join(' ')).join(' | ')).join('\n\n')}
+function fillTiming(sections,meter){const count=Number(meter.split('/')[0]);return sections.map(s=>({...s,bars:s.bars.flatMap(b=>b.events.map(e=>({events:[{...e,beats:count}],explicit:true})))}))}
 function makeTimeline(sections,meter){if(!['2/4','3/4','4/4','6/8'].includes(meter))throw Error('meter');const count=Number(meter.split('/')[0]);let cursor=0;const events=[];
  for(let si=0;si<sections.length;si++){const section=sections[si];if(!Number.isInteger(section.repeat)||section.repeat<1||section.repeat>8)throw Error('repeat');
   for(let repeat=0;repeat<section.repeat;repeat++)for(let bi=0;bi<section.bars.length;bi++){const bar=section.bars[bi];const sum=bar.events.reduce((sum,e)=>sum+(e.beats||0),0);if(!bar.events.length||bar.events.some(e=>!Number.isFinite(e.beats)||e.beats<=0)||Math.abs(sum-count)>.001)throw Error('duration');
-   for(const [eventIndex,event] of bar.events.entries()){if(event.chord!=='-'&&!shapes[event.chord])throw Error('chord');events.push({...event,eventIndex,start:cursor,section:si,bar:bi,repeat});cursor+=event.beats;}
+   for(const [eventIndex,event] of bar.events.entries()){if(event.notes?.length){if(event.chord!=='-'||event.notes.length>6||event.notes.some(n=>!Number.isInteger(n)||n<40||n>88))throw Error('chord')}else if(event.chord!=='-'&&!shapes[event.chord])throw Error('chord');events.push({...event,eventIndex,start:cursor,section:si,bar:bi,repeat});cursor+=event.beats;}
   }
  }if(!events.length||events.length>2048)throw Error('empty');return {events,total:cursor};
 }

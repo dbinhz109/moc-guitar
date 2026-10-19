@@ -1,5 +1,10 @@
 # Document library and practice review — 19 October 2026
 
+This is the baseline review before the MusicXML and guided-learning update.
+The current version also imports structured MusicXML notes/timing, offers image
+label corrections and has three learning steps per section. See the README for
+the current behavior. Image OCR limitations recorded below still apply.
+
 ## Result
 
 The application supports reviewed chord-accompaniment exercises. Uploading a
