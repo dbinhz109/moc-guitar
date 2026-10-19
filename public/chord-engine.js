@@ -47,7 +47,9 @@ function parseChart(text,options={}){
   const all=joined.every(token=>token==='-'||new RegExp('^(?:'+chordSource+'|\\-)(?::(?:\\?|[0-9]+(?:\\.[0-9]+)?))?$').test(normalize(token)));
   if(!all||!joined.length){if(options.strict)invalid.push(line);continue;}
   if(joined.length===1&&joined[0].length===1&&!options.allowSingle&&candidateLines<2)continue;
-  if(line.includes('|')){explicit=true;for(const barText of line.split('|').filter(x=>x.trim())){const events=eventsFor(barText);if(events.length)section.bars.push({events,explicit:true})}}
+  // A timed line without separators is one bar, including a saved single-bar section.
+  // Only untimed chord lists are split into provisional one-chord bars for review.
+  if(line.includes('|')||joined.some(token=>token.includes(':'))){explicit=true;for(const barText of line.split('|').filter(x=>x.trim())){const events=eventsFor(barText);if(events.length)section.bars.push({events,explicit:true})}}
   else for(const token of joined){const events=eventsFor(token);if(events.length)section.bars.push({events,explicit:false})}
  }
  flush();return {sections,invalid,explicit};

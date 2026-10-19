@@ -54,3 +54,28 @@ test('simplified timing is explicit and preserves section structure',()=>{
  const simplified=p.fillTiming(source,'2/4');assert.equal(simplified.length,2);assert.equal(simplified[1].repeat,2);assert.equal(p.makeTimeline(simplified,'2/4').total,12);
  const roundTrip=p.parseChart(p.chartText(simplified),{strict:true});assert.deepEqual(roundTrip.invalid,[]);assert.equal(p.makeTimeline(roundTrip.sections,'2/4').total,12);
 });
+
+test('keeps timed chords in a single bar and preserves saved-chart timing',()=>{
+ const p=globalThis.MocPractice;
+ const detected=p.detect('2/4\n60 BPM\nVerse x2\nC:1 G:1');
+ assert.equal(detected.sections[0].bars.length,1);
+ assert.deepEqual(detected.sections[0].bars[0].events,[{chord:'C',beats:1},{chord:'G',beats:1}]);
+ assert.equal(p.makeTimeline(detected.sections,'2/4').total,4);
+ const saved=p.chartText(detected.sections);
+ const reopened=p.parseChart(saved,{strict:true,allowSingle:true});
+ assert.deepEqual(reopened.invalid,[]);
+ assert.deepEqual(p.makeTimeline(reopened.sections,'2/4'),p.makeTimeline(detected.sections,'2/4'));
+});
+
+test('preserves rests and incomplete timing within one bar without guessing',()=>{
+ const p=globalThis.MocPractice;
+ const withRest=p.parseChart('Verse\nC:1 -:1',{strict:true});
+ assert.equal(withRest.sections[0].bars.length,1);
+ assert.equal(p.makeTimeline(withRest.sections,'2/4').total,2);
+ const incomplete=p.parseChart('C:1 G:?',{strict:true});
+ assert.equal(incomplete.sections[0].bars.length,1);
+ assert.throws(()=>p.makeTimeline(incomplete.sections,'2/4'),/duration/);
+ const multiline=p.parseChart('C:2\nG:2',{strict:true});
+ assert.equal(multiline.sections[0].bars.length,2);
+ assert.equal(p.makeTimeline(multiline.sections,'2/4').total,4);
+});

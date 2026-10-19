@@ -23,7 +23,11 @@ F:2 | C:2
 
 `|` separates bars. `C:2` holds C for two counts; `C:?` means duration unknown and blocks playback. `-:1` is a one-count rest. Every bar must total the meter numerator. In 6/8, each click counts an eighth note. Names such as Verse/Chorus/Intro/Bridge/Outro/Section label sections; `x2` repeats a section twice.
 
+A line with chord durations and no `|` represents one bar: `C:1 G:1` is a complete 2/4 bar, including after saving and reopening a plan. Separate timed lines represent separate bars. An untimed list such as `C G Am F` remains provisional until durations are entered or simplified timing is explicitly applied.
+
 The app teaches chord accompaniment. It does not automatically transcribe staff notes, melody, exact strumming patterns, repeat signs drawn on a score or guitar tablature. Image recognition can miss or confuse chord names, particularly in small images. Always compare against the displayed source. Automatically detected score sections correspond to staff lines and require review.
+
+PDF reading works on the selected page; it does not assemble a whole multi-page song automatically. Practice guidance combines chord shapes, string/fret directions, reference audio and timing exercises, rather than generating a complete song-specific course. See [the document-library review](docs/library-review.md) for verification results and recognition limitations.
 
 ## Accounts and library storage
 
