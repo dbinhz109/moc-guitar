@@ -1,11 +1,11 @@
 (function(root){
 let pdfPromise,ocrScript;
 async function pdfLibrary(){pdfPromise=pdfPromise||import('/vendor/pdfjs/pdf.mjs');const pdf=await pdfPromise;pdf.GlobalWorkerOptions.workerSrc='/vendor/pdfjs/pdf.worker.mjs';return pdf}
-function staffBands(canvas){const context=canvas.getContext('2d',{willReadFrequently:true}),{width:w,height:h}=canvas,data=context.getImageData(0,0,w,h).data;const rows=[];for(let y=0;y<h;y++){let dark=0;for(let x=Math.floor(w*.06);x<w*.94;x++){const i=(y*w+x)*4;if((data[i]+data[i+1]+data[i+2])/3<225)dark++}if(dark>w*.61)rows.push(y)}const groups=[];for(const y of rows){const last=groups.at(-1);if(last&&y-last.at(-1)<=Math.max(5,h*.015))last.push(y);else groups.push([y])}return groups.filter(group=>group.length>=4&&group.at(-1)-group[0]>h*.01&&group.at(-1)-group[0]<h*.065).map(group=>({top:Math.max(0,group[0]-Math.max(13,(group.at(-1)-group[0])*1.3)),bottom:group[0]-1,staffTop:group[0],staffBottom:group.at(-1)}))}
+function staffBands(canvas){return MocTab.staffBands(canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height))}
 async function imageCanvas(blob){const bitmap=await createImageBitmap(blob);const canvas=document.createElement('canvas');const scale=Math.min(1,2200/bitmap.width,3500/bitmap.height);canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();return canvas}
 function upscaleStrip(canvas,band){const crop=document.createElement('canvas');const scale=Math.min(5,2200/canvas.width);const x=Math.round(canvas.width*.105),width=Math.round(canvas.width*.84),height=Math.max(8,band.bottom-band.top);crop.width=Math.round(width*scale);crop.height=Math.round(height*scale);const ctx=crop.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,crop.width,crop.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(canvas,x,band.top,width,height,0,0,crop.width,crop.height);crop.sourceRect={x,y:band.top,width,height};return crop}
 async function ocrCanvas(canvas,options){if(!ocrScript)ocrScript=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/vendor/ocr/tesseract.min.js';script.onload=resolve;script.onerror=()=>{ocrScript=null;reject(Error('ocr-load'))};document.head.append(script)});await ocrScript;if(!options.isCurrent())throw Error('cancelled');const worker=await Tesseract.createWorker('eng',1,{workerPath:'/vendor/ocr/worker.min.js',corePath:'/vendor/ocr/core',workerBlobURL:false,logger:m=>{if(options.isCurrent()&&m.status==='recognizing text')options.onStatus?.({stage:'ocr',progress:m.progress})}});if(!options.isCurrent()){await worker.terminate();throw Error('cancelled')}options.onCancel(()=>worker.terminate());try{
- const bands=staffBands(canvas);if(options.kind!=='text'&&bands.length>=2){const lines=[],raw=[],anchors=[];for(let i=0;i<bands.length;i++){if(!options.isCurrent())throw Error('cancelled');options.onStatus?.({stage:'staff',line:i+1,total:bands.length});const result=await staffLabels(worker,canvas,bands[i],options);raw.push(result.raw);const candidates=result.labels;for(const candidate of candidates)anchors.push({...candidate,id:crypto.randomUUID(),index:anchors.length,region:i});lines.push(`Section ${i+1}\n`+candidates.map(c=>'['+c.chord+']').join(' '));}return {text:lines.join('\n\n'),raw:raw.join('\n'),mode:'staff-ocr',kind:'score',anchors,missingStaffs:lines.flatMap((line,i)=>line.split('\n')[1]?.trim()?[]:[i+1]),staffCount:bands.length,regions:bands.filter((b,i)=>lines[i].split('\n')[1]?.trim()).map(b=>({top:b.top/canvas.height,height:(b.staffBottom-b.top+20)/canvas.height})),lowResolution:canvas.width<700};}
+ const bands=staffBands(canvas),tabs=bands.filter(b=>b.lineCount===6&&b.regular);if(options.kind!=='text'&&tabs.length)return await tabOCR(worker,canvas,tabs,bands,options);if(options.kind==='tab'||options.kind!=='text'&&bands.some(b=>b.lineCount===6))return {text:'',mode:'tab-ocr',kind:'tab',tabDraft:[],tabWarnings:['no-lines']};if(options.kind==='notes')return {text:'',mode:'notation-unsupported',kind:'notes'};if(options.kind!=='text'&&bands.length>=2){const lines=[],raw=[],anchors=[];for(let i=0;i<bands.length;i++){if(!options.isCurrent())throw Error('cancelled');options.onStatus?.({stage:'staff',line:i+1,total:bands.length});const result=await staffLabels(worker,canvas,bands[i],options);raw.push(result.raw);const candidates=result.labels;for(const candidate of candidates)anchors.push({...candidate,id:crypto.randomUUID(),index:anchors.length,region:i});lines.push(`Section ${i+1}\n`+candidates.map(c=>'['+c.chord+']').join(' '));}return {text:lines.join('\n\n'),raw:raw.join('\n'),mode:'staff-ocr',kind:'score',anchors,missingStaffs:lines.flatMap((line,i)=>line.split('\n')[1]?.trim()?[]:[i+1]),staffCount:bands.length,regions:bands.filter((b,i)=>lines[i].split('\n')[1]?.trim()).map(b=>({top:b.top/canvas.height,height:(b.staffBottom-b.top+20)/canvas.height})),lowResolution:canvas.width<700};}
  await worker.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});const result=await worker.recognize(canvas);return {text:result.data.text,mode:'ocr',kind:options.kind==='auto'?'chords':options.kind,lowResolution:canvas.width<700};
  }finally{await worker.terminate().catch(()=>{})}}
 
@@ -34,6 +34,32 @@ async function staffLabels(worker,canvas,band,options){
  }
  return {labels,raw:raw.join(' · ')};
 }
+async function tabOCR(worker,canvas,tabs,bands,options){
+ const pixels=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height),draft=[],raw=[];
+ let total=0;
+ for(const [line,band] of tabs.entries()){
+  const points=[];
+  for(const box of MocTab.regions(pixels,band)){
+   if(++total>512)throw Error('tab-size');if(!options.isCurrent())throw Error('cancelled');
+   options.onStatus?.({stage:'tab',line:line+1,total:tabs.length});
+   const readings=[];
+   for(const mode of ['10','7']){
+    await worker.setParameters({tessedit_pageseg_mode:mode,tessedit_char_whitelist:'0123456789OoIl',preserve_interword_spaces:'1'});
+    const crop=document.createElement('canvas'),scale=48/box.height,pad=16;crop.width=Math.ceil(box.width*scale)+pad*2;crop.height=48+pad*2;
+    const ctx=crop.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,crop.width,crop.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(canvas,box.x,box.y,box.width,box.height,pad,pad,box.width*scale,48);
+    const data=(await worker.recognize(crop)).data,text=data.text.trim().replace(/[Oo]/g,'0').replace(/[Il]/g,'1');
+    if(/^\d{1,2}$/.test(text)&&Number(text)<=24)readings.push({fret:Number(text),confidence:Number(data.confidence)||0});
+    if(readings.at(-1)?.confidence>=85)break;
+   }
+   const best=readings.sort((a,b)=>b.confidence-a.confidence)[0];
+   // Unknown symbols remain in the review grid instead of silently dropping notes.
+   points.push({...box,fret:best?.confidence>=65?best.fret:null,confidence:best?.confidence||0});
+   raw.push(`${line+1}:${box.string}/${best?best.fret:'?'} (${Math.round(best?.confidence||0)}%)`);
+  }
+  draft.push({columns:MocTab.columns(points,Math.max(1,band.spacing*.35)),top:band.staffTop/canvas.height,bottom:band.staffBottom/canvas.height});
+ }
+ return {text:'',raw:raw.join(' · '),mode:'tab-ocr',kind:'tab',tabDraft:draft,tabWarnings:[],scoreStructure:{staves:bands.filter(b=>b.lineCount===5).length,tablatures:tabs.length},regions:[],lowResolution:tabs.some(b=>b.spacing<10),sourceWidth:canvas.width,sourceHeight:canvas.height};
+}
 function ocrLabels(data,strip,canvas){
  const pattern=/(?<![a-zA-Z])[A-G](?:#|b)?(?:maj7|m7|m|7|sus2|sus4|add9)?(?:\/[A-G](?:#|b)?)?(?![a-zA-Z])/g;
  const words=[];function walk(node){if(!node)return;if(Array.isArray(node)){node.forEach(walk);return}if(node.words){words.push(...node.words);return}for(const key of ['blocks','paragraphs','lines'])if(node[key])walk(node[key]);}walk(data);
@@ -48,8 +74,8 @@ async function musicXML(file,options={}){
  return {xml:result,text:MocPractice.chartText(result.sections),mode:'musicxml',kind:'musicxml',pages:1};
 }
 
-async function read(file,options){const blob=await ensureBlob(file);if(['xml','musicxml','mxl'].includes(file.ext))return musicXML({...file,blob},options);if(['txt','md'].includes(file.ext))return {text:(await blob.text()).slice(0,100000),mode:'text',kind:'chords',pages:1};if(file.ext!=='pdf')return ocrCanvas(await imageCanvas(blob),options);
+async function read(file,options){const blob=await ensureBlob(file);if(['xml','musicxml','mxl'].includes(file.ext))return musicXML({...file,blob},options);if(['txt','md'].includes(file.ext)){const text=(await blob.text()).slice(0,100000),tab=MocTab.textTab(text);return tab.draft.length||tab.blocked?{text,mode:'tab-text',kind:'tab',tabDraft:tab.draft,tabWarnings:tab.warnings,pages:1}:{text,mode:'text',kind:'chords',pages:1};}if(file.ext!=='pdf')return ocrCanvas(await imageCanvas(blob),options);
  const pdf=await pdfLibrary();const task=pdf.getDocument({data:new Uint8Array(await blob.arrayBuffer()),wasmUrl:'/vendor/pdfjs/wasm/',standardFontDataUrl:'/vendor/pdfjs/standard_fonts/',cMapUrl:'/vendor/pdfjs/cmaps/',cMapPacked:true,isEvalSupported:false});options.onCancel(()=>task.destroy());try{const doc=await task.promise;if(options.page<1||options.page>doc.numPages)throw Error('page');const page=await doc.getPage(options.page);const content=await page.getTextContent();let text='',lastY=null;for(const item of content.items){if(!('str'in item))continue;const y=Math.round(item.transform[5]);if(lastY!==null&&Math.abs(y-lastY)>3)text+='\n';text+=item.str+(item.hasEOL?'\n':' ');lastY=item.hasEOL?null:y}
- if(text.trim().length>=8&&options.kind!=='score')return {text,mode:'text',kind:'chords',pages:doc.numPages};const viewport=page.getViewport({scale:1.7});const scale=Math.min(1,2200/viewport.width,3500/viewport.height);const actual=page.getViewport({scale:1.7*scale});const canvas=document.createElement('canvas');canvas.width=Math.ceil(actual.width);canvas.height=Math.ceil(actual.height);await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport:actual}).promise;return {...await ocrCanvas(canvas,options),pages:doc.numPages};}finally{await task.destroy()}}
+ const viewport=page.getViewport({scale:1.7});const scale=Math.min(1,2200/viewport.width,3500/viewport.height);const actual=page.getViewport({scale:1.7*scale});const canvas=document.createElement('canvas');canvas.width=Math.ceil(actual.width);canvas.height=Math.ceil(actual.height);await page.render({canvas,canvasContext:canvas.getContext('2d'),viewport:actual}).promise;if(text.trim().length>=8&&!['score','tab','notes'].includes(options.kind)&&!(options.kind!=='text'&&staffBands(canvas).some(b=>b.lineCount===6))){const tab=MocTab.textTab(text);if(tab.draft.length||tab.blocked)return {text,mode:'tab-text',kind:'tab',tabDraft:tab.draft,tabWarnings:tab.warnings,pages:doc.numPages};return {text,mode:'text',kind:'chords',pages:doc.numPages};}return {...await ocrCanvas(canvas,options),pages:doc.numPages};}finally{await task.destroy()}}
 root.MocDocuments={read,staffBands,musicXML};
 })(globalThis);

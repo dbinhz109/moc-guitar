@@ -49,3 +49,10 @@ The new test asserts every label, staff grouping, order, and unknown-duration ga
 These two matching image variants do not establish accuracy across other scores.
 Staff notes, original rhythm, melody and original strumming are not transcribed
 from an image; durations in the supplied reference have not been verified.
+
+## Follow-up: score plus TAB
+
+The later Lágrima report exposed a different failure: six-line TAB was being
+counted alongside five-line notation, and note ink was read as F chord labels.
+The TAB reader now routes this layout to reviewed string/fret notes instead.
+See [TAB notes](tab-notes.md) for reproduction, tests and remaining limits.

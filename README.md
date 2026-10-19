@@ -6,9 +6,9 @@ A beginner guitar learning studio, English by default with Vietnamese localizati
 
 1. Open **My library** and upload MusicXML (`.musicxml`, `.xml`, `.mxl`), PDF, PNG/JPEG/WebP or UTF-8 text/Markdown (up to 10 MB).
 2. The document viewer includes **Review chords & learn**. The review screen keeps the original beside the editable plan, with image zoom and PDF page selection.
-3. Review candidate chord labels. Image reading detects staff bands and reads the labels above them when possible. Results are never treated as verified automatically; an empty result explicitly says no lesson was created.
+3. Review the recognized content. Six-line guitar TAB is read as string/fret positions; printed chord labels are read above five-line staves when possible. Results are never treated as verified automatically; an empty result explicitly says no lesson was created.
 4. Confirm the source meter: 2/4, 3/4, 4/4 or 6/8. Unknown meters remain unselected.
-5. Enter chord durations and bars, or explicitly apply **one-bar practice timing** for a simplified exercise.
+5. Enter note/chord durations and bars, or explicitly apply **one-bar practice timing** for a simplified exercise.
 6. Confirm your review, then save and practice. Playback follows the declared bars, durations and section repeats, with optional synthesized chord changes and separate chord previews.
 
 Example in 2/4:
@@ -25,13 +25,22 @@ F:2 | C:2
 
 A line with chord durations and no `|` represents one bar: `C:1 G:1` is a complete 2/4 bar, including after saving and reopening a plan. Separate timed lines represent separate bars. An untimed list such as `C G Am F` remains provisional until durations are entered or simplified timing is explicitly applied.
 
-The app teaches chord accompaniment. It does not automatically transcribe staff notes, melody, exact strumming patterns, repeat signs drawn on a score or guitar tablature. Image recognition can miss or confuse chord names, particularly in small images. Always compare against the displayed source. Automatically detected score sections correspond to staff lines and require review.
+The app teaches chord accompaniment and reviewed note/TAB exercises. It does not automatically transcribe five-line staff notes from images, infer harmony from notes, or reconstruct full rhythm, overlapping voices, articulation, strumming or graphical repeat signs. For a staff-only image, select **Staff notes** to avoid chord-label OCR and use MusicXML or enter notes manually. Image recognition can miss or confuse chord names, particularly in small images. Always compare against the displayed source. Automatically detected score sections correspond to staff lines and require review.
 
 For sufficiently resolved score images, staff-label reading separates text-sized ink regions from clefs/stems and reads each label independently. This preserves labels at the left margin and at differing vertical positions. Small images retain the line-reading fallback and an explicit low-resolution warning. Missing label groups on a staff are reported for manual review.
 
-Unmeasured label sequences appear as `Am:? Em:? F:?`, without invented bar separators. A `Section` follows one staff system, not one musical phrase or measure. `?` means duration is unknown. Enter the source's bar boundaries and durations explicitly; `F:1 Em:2 | Am:3` is an example of two chords sharing a 3/4 bar, not a transcription of the supplied song. Choosing 3/4 alone never assigns three counts to each chord. One-bar-per-chord timing remains an explicitly chosen simplified drill.
+Unmeasured label sequences appear as `Am:? Em:? F:?`, without invented bar separators. In chord-label OCR, a `Section` follows one detected staff band, not one musical phrase or measure. Five- and six-line bands are distinguished before chord reading: a score-plus-TAB page uses the TAB reader, rather than counting both layers as chord-label sections. `?` means duration is unknown. Enter the source's bar boundaries and durations explicitly; `F:1 Em:2 | Am:3` is an example of two chords sharing a 3/4 bar, not a transcription of the supplied song. Choosing 3/4 alone never assigns three counts to each chord. One-bar-per-chord timing remains an explicitly chosen simplified drill.
 
 Saved image plans are preserved. Older suggestions show a **Read again** notice so recognition can be refreshed without silently overwriting user edits.
+
+### Guitar TAB notes
+
+- Automatic image/PDF reading separates regular six-line TAB from five-line notation and reads fret-number regions on each string. Only standard tuning (1→6: E4, B3, G3, D3, A2, E2), frets 0–24, is supported. Positions at the same horizontal location are provisional simultaneous groups. String/fret positions remain attached to the notes after save/reload and account sync; they are not replaced by generic fingering suggestions.
+- Six aligned ASCII TAB lines (`e|`, `B|`, `G|`, `D|`, `A|`, `E|`) work in text uploads or the recognized-text editor. A downloadable original [TAB sample](public/samples/first-tab.txt) is available in My library.
+- **Review TAB notes** lets the learner correct string/fret pairs, insert/remove groups or lines, preview sounds, and enter local bar numbers and counts. Image markers link back to the corresponding review row. `1/4+3/1` means string 1 fret 4 and string 3 fret 1 played together. This is a note group, not an inferred chord name.
+- Low-confidence image symbols remain `?`. Any unresolved fret blocks the entire derived plan; a partial sequence is not silently used. Bar boundaries and duration are not inferred from horizontal spacing. Set consecutive local bar numbers starting at 1 per line and counts, or explicitly choose the simplified drill. In text plans, `@1/4+3/1:1` represents the same simultaneous group for one count.
+- TAB sections correspond to detected TAB lines, **not measures**. On the supplied Lágrima image, four notation staves and four TAB staves are distinguished, rather than producing Section 4/6/8 with false F chords. The original 487-pixel-wide image still leaves many fret symbols unresolved; this is not a complete transcription of Lágrima. A separate original clear raster test reads all six authored positions, including an open string, fret 12 and a simultaneous pair.
+- Image reading is intended for upright, clear, printed six-line TAB. Small, skewed, handwritten or complex layouts need manual correction. Text technique marks are warned about; image technique marks, rests, ties, sustained polyphonic voices, alternate tunings, capo and repeat/ending signs are not automatically interpreted. Playback is a sequence of reviewed note-group attacks and durations, not a full engraving performance.
 
 ### MusicXML notes and chord symbols
 
@@ -49,7 +58,7 @@ Detected staff-label word boxes become clickable markers on PNG/JPEG/WebP origin
 
 ### Three steps for each section
 
-Practice is organized into **positions/shapes → neighboring changes → full section**. Change previews use the actual neighboring sounds in that section. A practice-speed slider and the current learning step are saved with the plan and sync to the account. Completion remains self-reported; there is no microphone grading. Images still supply chord candidates rather than automatically transcribed melodies.
+Practice is organized into **positions/shapes → neighboring changes → full section**. Change previews use the actual neighboring sounds in that section. A practice-speed slider and the current learning step are saved with the plan and sync to the account. Completion remains self-reported; there is no microphone grading. Images supply either printed-chord candidates or reviewed TAB pitch candidates; image rhythm is not automatically transcribed.
 
 PDF reading works on the selected page; it does not assemble a whole multi-page song automatically. Practice guidance combines chord shapes, string/fret directions, reference audio and timing exercises, rather than generating a complete song-specific course. See [the document-library review](docs/library-review.md) for verification results and recognition limitations.
 
@@ -122,3 +131,15 @@ Passwords use salted scrypt (N=32768, r=8, p=3). Seven-day sessions use random t
 PDF.js/Tesseract browser assets are generated from pinned dependencies by `prebuild`. OCR downloads English recognition data from the Tesseract data CDN on first use; recognition runs in the browser. The English model targets Latin chord labels; lyrics may be inaccurate.
 
 Sites hosting configuration lives in `.openai/hosting.json`; D1/R2 bindings are provisioned by Sites. Platform access is separate from username/password accounts and remains owner-private. Deployment applies checked-in migrations. Never commit credentials, local databases, `.env` files or generated assets.
+
+### TAB verification
+
+```sh
+node --test tests/tab.test.mjs tests/score-glyphs.test.mjs tests/practice.test.mjs tests/musicxml.test.mjs
+# Against the local preview, with Playwright available:
+MOC_PLAYWRIGHT_MODULE=/path/to/playwright node tests/tab-image-recognition.cjs
+MOC_PLAYWRIGHT_MODULE=/path/to/playwright node tests/notation-recognition.cjs /path/to/lagrima-image.png
+npm run test:library
+```
+
+The clear-image regression generates its own raster fixture. The Lágrima check asserts classification and honest unknown handling, not a complete musical transcription. See [TAB recognition notes](docs/tab-notes.md).

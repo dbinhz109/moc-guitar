@@ -1,0 +1,12 @@
+First TAB — original beginner exercise
+Standard tuning only. Six strings, thinnest to thickest: e B G D A E.
+Notes at the same column are played together.
+No rhythm is encoded here: review the notes, select a meter, then enter timing
+or explicitly choose the one-bar practice drill.
+
+e|--0--2--4--7--|
+B|--0-----------|
+G|--------1-----|
+D|--------------|
+A|--------------|
+E|--0-----------|

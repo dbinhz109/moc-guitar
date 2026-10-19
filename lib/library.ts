@@ -54,7 +54,10 @@ export async function updatePractice(request:Request,id:string){
    for(const bar of section.bars){
     if(!bar||!Array.isArray(bar.events)||!bar.events.length||bar.events.length>16)throw new AccountError('invalid_request');
     let sum=0;
-    for(const event of bar.events){events++;if(events>512||typeof event.chord!=='string'||!/^([A-G](#|b)?[a-zA-Z0-9]*(\/[A-G](#|b)?)?|-)$/.test(event.chord)||typeof event.beats!=='number'||!Number.isFinite(event.beats)||event.beats<=0||event.beats>6)throw new AccountError('invalid_request');if(event.notes!==undefined&&(!Array.isArray(event.notes)||!event.notes.length||event.notes.length>6||event.chord!=='-'||event.notes.some((n:unknown)=>typeof n!=='number'||!Number.isInteger(n)||n<40||n>88)))throw new AccountError('invalid_request');sum+=event.beats;}
+    for(const event of bar.events){events++;if(events>512||typeof event.chord!=='string'||!/^([A-G](#|b)?[a-zA-Z0-9]*(\/[A-G](#|b)?)?|-)$/.test(event.chord)||typeof event.beats!=='number'||!Number.isFinite(event.beats)||event.beats<=0||event.beats>6)throw new AccountError('invalid_request');if(event.notes!==undefined&&(!Array.isArray(event.notes)||!event.notes.length||event.notes.length>6||event.chord!=='-'||event.notes.some((n:unknown)=>typeof n!=='number'||!Number.isInteger(n)||n<40||n>88)))throw new AccountError('invalid_request');if(event.tab!==undefined){
+      if(!Array.isArray(event.tab)||!event.tab.length||event.tab.length>6||!Array.isArray(event.notes)||event.notes.length!==event.tab.length||new Set(event.tab.map((p:{string:number})=>p?.string)).size!==event.tab.length)throw new AccountError('invalid_request');
+      for(const [index,p] of event.tab.entries())if(!p||!Number.isInteger(p.string)||p.string<1||p.string>6||!Number.isInteger(p.fret)||p.fret<0||p.fret>24||event.notes[index]!==[40,45,50,55,59,64][6-p.string]+p.fret)throw new AccountError('invalid_request');
+     }sum+=event.beats;}
     if(Math.abs(sum-Number(String(value.meter).split('/')[0]))>.001)throw new AccountError('invalid_request');
    }
   }
