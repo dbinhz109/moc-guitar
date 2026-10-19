@@ -41,7 +41,7 @@ function parseChart(text,options={}){
   if(heading){flush();section.name=heading[1]+(heading[2]?' '+heading[2]:'');section.repeat=Math.min(8,Number(heading[3])||1);line=heading[4].trim();if(!line)continue;}
   const repeat=line.match(/\s+[x×]\s*(\d+)\s*$/i);if(repeat){section.repeat=Math.min(8,Number(repeat[1])||1);line=line.slice(0,repeat.index).trim();}
   const bracketed=[...line.matchAll(new RegExp('\\[('+chordSource+')\\]','g'))].map(m=>({chord:normalize(m[1]),beats:null}));
-  if(bracketed.length){section.bars.push(...bracketed.map(event=>({events:[event],explicit:false})));continue}
+  if(bracketed.length){section.bars.push({events:bracketed,explicit:false});continue}
   const tokenText=line.replace(/[|,;·→–—]/g,' ').trim();
   const raw=tokenText.split(/\s+/).filter(Boolean);
   const joined=raw.flatMap(token=>exact.test(normalize(token))?[token]:(raw.length>1&&new RegExp('^(?:'+chordSource+')+$').test(normalize(token))?normalize(token).match(new RegExp(chordSource,'g')):[token]));
@@ -49,9 +49,9 @@ function parseChart(text,options={}){
   if(!all||!joined.length){if(options.strict)invalid.push(line);continue;}
   if(joined.length===1&&joined[0].length===1&&!options.allowSingle&&candidateLines<2)continue;
   // A timed line without separators is one bar, including a saved single-bar section.
-  // Only untimed chord lists are split into provisional one-chord bars for review.
-  if(line.includes('|')||joined.some(token=>token.includes(':'))){explicit=true;for(const barText of line.split('|').filter(x=>x.trim())){const events=eventsFor(barText);if(events.length)section.bars.push({events,explicit:true})}}
-  else for(const token of joined){const events=eventsFor(token);if(events.length)section.bars.push({events,explicit:false})}
+  // Untimed labels stay in an unmeasured group until bar boundaries are reviewed.
+  if(line.includes('|')||joined.some(token=>/:\d/.test(token))){explicit=true;for(const barText of line.split('|').filter(x=>x.trim())){const events=eventsFor(barText);if(events.length)section.bars.push({events,explicit:true})}}
+  else{const events=joined.flatMap(token=>eventsFor(token));if(events.length)section.bars.push({events,explicit:false})}
  }
  flush();return {sections,invalid,explicit};
 }
@@ -60,7 +60,7 @@ function detect(text,options={}){
  const time=text.match(/\b(2\/4|3\/4|4\/4|6\/8)\b/);const tempo=text.match(/\b(\d{2,3})\s*BPM\b/i);
  return {...parsed,sequence,confidence:sequence.length?'review':'none',unsupported:[...new Set(sequence.filter(c=>!shapes[c]))],meter:time?time[1]:null,bpm:tempo&&+tempo[1]>=40&&+tempo[1]<=180?+tempo[1]:null,hasTab:/^[eBGDAE]\s*\|[-\d|hpbr~\/\\]+/m.test(text)};
 }
-function chartText(sections){return sections.map(s=>(s.name||'Section')+(s.repeat>1?' x'+s.repeat:'')+'\n'+s.bars.map(b=>b.events.map(e=>(e.notes?.length?root.MocNotes.noteToken(e.notes):e.chord)+':'+(e.beats??'?')).join(' ')).join(' | ')).join('\n\n')}
+function chartText(sections){return sections.map(s=>{const unmeasured=s.bars.every(b=>b.explicit===false&&b.events.every(e=>e.beats===null));return (s.name||'Section')+(s.repeat>1?' x'+s.repeat:'')+'\n'+s.bars.map(b=>b.events.map(e=>(e.notes?.length?root.MocNotes.noteToken(e.notes):e.chord)+':'+(e.beats??'?')).join(' ')).join(unmeasured?' ':' | ')}).join('\n\n')}
 function fillTiming(sections,meter){const count=Number(meter.split('/')[0]);return sections.map(s=>({...s,bars:s.bars.flatMap(b=>b.events.map(e=>({events:[{...e,beats:count}],explicit:true})))}))}
 function makeTimeline(sections,meter){if(!['2/4','3/4','4/4','6/8'].includes(meter))throw Error('meter');const count=Number(meter.split('/')[0]);let cursor=0;const events=[];
  for(let si=0;si<sections.length;si++){const section=sections[si];if(!Number.isInteger(section.repeat)||section.repeat<1||section.repeat>8)throw Error('repeat');

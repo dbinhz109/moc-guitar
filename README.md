@@ -27,6 +27,12 @@ A line with chord durations and no `|` represents one bar: `C:1 G:1` is a comple
 
 The app teaches chord accompaniment. It does not automatically transcribe staff notes, melody, exact strumming patterns, repeat signs drawn on a score or guitar tablature. Image recognition can miss or confuse chord names, particularly in small images. Always compare against the displayed source. Automatically detected score sections correspond to staff lines and require review.
 
+For sufficiently resolved score images, staff-label reading separates text-sized ink regions from clefs/stems and reads each label independently. This preserves labels at the left margin and at differing vertical positions. Small images retain the line-reading fallback and an explicit low-resolution warning. Missing label groups on a staff are reported for manual review.
+
+Unmeasured label sequences appear as `Am:? Em:? F:?`, without invented bar separators. A `Section` follows one staff system, not one musical phrase or measure. `?` means duration is unknown. Enter the source's bar boundaries and durations explicitly; `F:1 Em:2 | Am:3` is an example of two chords sharing a 3/4 bar, not a transcription of the supplied song. Choosing 3/4 alone never assigns three counts to each chord. One-bar-per-chord timing remains an explicitly chosen simplified drill.
+
+Saved image plans are preserved. Older suggestions show a **Read again** notice so recognition can be refreshed without silently overwriting user edits.
+
 ### MusicXML notes and chord symbols
 
 MusicXML **score-partwise** files can provide written pitches and timing directly, without OCR. Choose a part, then **Chord accompaniment** or **Written notes**; note mode also offers voice selection. Plain XML and compressed MXL (using the declared container root) are supported. The library includes an original downloadable sample, **First Steps**.
@@ -76,6 +82,7 @@ Apply each migration once, in order. Local D1/R2 and hosted resources are separa
 ```sh
 npm run test:practice
 npm run test:musicxml
+node --test tests/score-glyphs.test.mjs
 npx tsc --noEmit
 node --check public/library.js
 node --check public/document-reader.js
@@ -90,6 +97,14 @@ npm run test:library
 ```
 
 API tests create disposable accounts in local D1/R2. `MOC_TEST_BASE_URL` selects another loopback preview. Tests cover authentication/session ownership, file ownership and content checks, import deduplication, optimistic revisions, isolated chord labels, unknown meter, 2/4 timing, bars and section repeats.
+
+Optional actual-image regression (requires Playwright, Chrome and a running local preview):
+
+```sh
+MOC_PLAYWRIGHT_MODULE=/absolute/path/to/playwright node tests/score-recognition.cjs /absolute/path/to/nhat-ky-cua-me.jpg
+```
+
+The user-reviewed label reference is in `tests/fixtures/nhat-ky-reference.json`. The test checks all 30 labels across five staff systems, leaves durations unknown, and verifies multiple chords within a 3/4 bar. The original score image is not distributed in this repository. Passing this particular reference is not a general OCR accuracy claim.
 
 ## Source and hosting
 

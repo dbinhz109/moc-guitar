@@ -1,0 +1,11 @@
+{
+  "description": "User-reviewed chord labels, one section per staff system. No chord durations have been verified.",
+  "meter": "3/4",
+  "sections": [
+    ["Am", "Em", "F", "C", "Am"],
+    ["Em", "F", "Em", "Am", "Am", "Em"],
+    ["F", "G", "Am", "F", "Am", "G", "C"],
+    ["Am", "Em", "F", "G", "Am", "F"],
+    ["Em", "F", "G", "Am", "F", "Em"]
+  ]
+}

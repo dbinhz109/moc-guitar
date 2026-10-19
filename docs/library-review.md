@@ -2,8 +2,10 @@
 
 This is the baseline review before the MusicXML and guided-learning update.
 The current version also imports structured MusicXML notes/timing, offers image
-label corrections and has three learning steps per section. See the README for
-the current behavior. Image OCR limitations recorded below still apply.
+label corrections and has three learning steps per section. The later
+[staff-label OCR correction](ocr-staff-labels.md) fixes the supplied Nhật ký image
+reference; the baseline recognition counts below are historical. See the README
+for current behavior and the remaining image-recognition limits.
 
 ## Result
 
